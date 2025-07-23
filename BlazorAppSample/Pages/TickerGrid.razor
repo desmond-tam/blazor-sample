@@ -1,0 +1,138 @@
+﻿@page "/ticker-grid"
+@using BlazorBootstrap
+@using BlazorAppSample.Services
+@using BlazorAppSample.Models
+@using System.ComponentModel.DataAnnotations
+
+@inherits LayoutComponentBase
+@inject ITickerService service
+
+<h3>Index Grid</h3>
+@if (list == null)
+{
+    <Spinner />
+}
+else
+{
+    <a class="expand-holder" style="cursor:pointer" @onclick="@(() => ToggleSearch())">@(@expand ? "Expand >" : "Collapse <")</a>
+    <Collapse @ref="search" Class="search-container">
+        <Card>
+            <CardBody>
+                <EditForm EditContext="@editContext" OnValidSubmit="HandleOnValidSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3 mt-3">
+                        <AutoComplete Class="form-control" @bind-Value="selectedIndex"
+                                      TItem="AutoCompleteModel"
+                                      DataProvider="IndexDataProvider"
+                                      PropertyName="Name"
+                                      Placeholder="Search Index..."
+                                      OnChanged="(AutoCompleteModel indx) => OnIndexAutoCompleteChanged(indx)" required />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 button-holder">
+                            <Button Type="ButtonType.Submit" Color="ButtonColor.Success" Class="me-2">Search</Button>
+                            <Button Type="ButtonType.Button" Color="ButtonColor.Secondary" Class="me-2" @onclick="ResetForm">Reset</Button>
+                        </div>
+                    </div>
+                </EditForm>
+            </CardBody>
+        </Card>
+    </Collapse>
+      <Grid @ref="tickerDataGridRef"
+          TItem="TickerModel"
+          Class="table table-hover table-bordered table-striped"
+              DataProvider="TickerDataProvider"
+            AllowPaging="true"
+            PageSize="10"
+          AllowSorting="true"
+          Responsive="true">
+
+
+            <GridColumn TItem="TickerModel" HeaderText="Index" SortString="Index" SortKeySelector="item => item.Index" PropertyName="Index">
+                @context.Index
+            </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="Date" SortString="LocalDateTime" SortKeySelector="item => item.LocalDateTime" PropertyName="LocalDateTime">
+            @context.LocalDateTime
+        </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="Open" SortString="Open" SortKeySelector="item => item.Open" PropertyName="Open">
+            @context.Open.ToString("F2")
+        </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="Close" SortString="Close" SortKeySelector="item => item.Close" PropertyName="Close">
+            @context.Close.ToString("F2")
+        </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="High" SortString="High" SortKeySelector="item => item.High" PropertyName="High">
+            @context.High.ToString("F2")
+        </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="Low" SortString="Low" SortKeySelector="item => item.Low" PropertyName="Low">
+            @context.Low.ToString("F2")
+        </GridColumn>
+        <GridColumn TItem="TickerModel" HeaderText="Volume" SortString="Volume" SortKeySelector="item => item.Volume" PropertyName="Volume">
+            @context.Volume.ToString("F2")
+        </GridColumn>
+
+    </Grid>
+}
+@code {
+    private TickerSearchModel searchForm = new();
+    private Collapse search = default!;
+    private bool expand = true;
+    private EditContext? editContext;
+
+    private Grid<TickerModel> tickerDataGridRef = default!;
+    private IEnumerable<TickerModel>? list = null;
+    private IEnumerable<AutoCompleteModel> indexes = null!;
+    private string selectedIndex = string.Empty;
+    private int pagesize = 12;
+
+    protected override async Task OnInitializedAsync()
+    {
+        editContext = new EditContext(searchForm);
+        list = await service.GetPage(null,null,1, pagesize);
+    }
+
+    private async Task ResetForm()
+    {
+        searchForm = new();
+        editContext = new EditContext(searchForm);
+        selectedIndex = string.Empty;
+        await tickerDataGridRef.RefreshDataAsync();
+    }
+
+    public async Task HandleOnValidSubmit()
+    {
+        await tickerDataGridRef.RefreshDataAsync();
+    }
+
+    private async Task ToggleSearch()
+    {
+        Console.WriteLine("test");
+        await search.ToggleAsync();
+        expand = !expand;
+    }
+
+    private async Task<GridDataProviderResult<TickerModel>> TickerDataProvider(GridDataProviderRequest<TickerModel> request)
+    {
+        list = await service.GetPage(searchForm,request.Sorting, request.PageNumber, request.PageSize);
+        int total = await service.GetTotalRecords(searchForm);
+        return (new GridDataProviderResult<TickerModel> { Data = list, TotalCount = total });
+    }
+
+    private async Task<AutoCompleteDataProviderResult<AutoCompleteModel>> IndexDataProvider(AutoCompleteDataProviderRequest<AutoCompleteModel> request)
+    {
+        if (indexes is null) // pull customers only one time for client-side autocomplete
+            indexes = await service.GetAllIndexes();
+
+        return await Task.FromResult(request.ApplyTo(indexes.OrderBy(x => x.Name)));
+    }
+
+    private void OnIndexAutoCompleteChanged(AutoCompleteModel indx)
+    {
+        if (indx != null)
+        {
+            searchForm.Index = indx.Value;
+        }
+
+    }
+}

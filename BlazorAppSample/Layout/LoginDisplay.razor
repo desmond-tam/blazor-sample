@@ -1,0 +1,45 @@
+﻿@using BlazorAppSample.Services
+@using BlazorAppSample.Services.Interfaces
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+
+<AuthorizeView>
+    <Authorized>
+        Hello, @context.User.Identity?.Name!
+        <button class="nav-link btn btn-link" @onclick="BeginLogOut">Log out</button>
+
+    </Authorized>
+    <NotAuthorized>
+        <a href="authentication/login" title="need an existing microsoft account">Log in</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("testing");
+        AuthStateProvider.AuthenticationStateChanged += async (task) => await OnAuthenticationStateChanged(task);
+    }
+
+    private async Task OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        var authState = await task;
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            // If using JWT, the token might be in the user's claims
+            var email = user.Claims.Where(c => c.Type == "email").FirstOrDefault();
+           // await userService.Login(email?.Value ?? "");
+        }
+    }
+
+
+    public void BeginLogOut()
+    {
+        Navigation.NavigateToLogout("authentication/logout");
+    }
+}
